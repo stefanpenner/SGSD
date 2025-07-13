@@ -25,24 +25,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(quitItem)
                 self.statusItem.menu = menu
                 button.performClick(nil)
-                self.statusItem.menu = nil // Clear menu after use
-                return nil // Consume the event
+                self.statusItem.menu = nil
+                return nil
             } else if event.type == .leftMouseDown {
                 self.toggleTimer()
-                return nil // Consume the event
+                return nil
             }
-            return event // Pass through unhandled events
+            return event
         }
 
         // Set up notifications
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+        center.requestAuthorization(options: [.alert, .sound, .criticalAlert]) { granted, error in
             if let error = error { print("Notification authorization error: \(error)") }
             if !granted { print("Notification permission denied") }
+            else { print("Notification permission granted") }
         }
         
         // Register notification category
-        let category = UNNotificationCategory(identifier: "SGSD", actions: [], intentIdentifiers: [], options: [])
+        let category = UNNotificationCategory(identifier: "SGSD", actions: [], intentIdentifiers: [], options: [.customDismissAction])
         center.setNotificationCategories([category])
     }
 
@@ -56,7 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             remainingTime = DURATION
             timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
             isRunning = true
-            updateTimer() // Update title immediately
+            updateTimer()
         }
     }
 
@@ -72,11 +73,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = "🙉"
             let content = UNMutableNotificationContent()
             content.title = "SGSD"
+            content.subtitle = "SGSD Timer"
             content.body = "Time is up! Take a break :)"
             content.sound = UNNotificationSound.default
             content.categoryIdentifier = "SGSD"
+            content.interruptionLevel = .critical
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-            let request = UNNotificationRequest(identifier: "SGSD", content: content, trigger: trigger)
+            let request = UNNotificationRequest(identifier: "SGSD_\(UUID().uuidString)", content: content, trigger: trigger)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error = error { print("Notification delivery error: \(error)") }
                 else { print("Notification scheduled successfully") }
