@@ -1,7 +1,8 @@
 import Cocoa
 import UserNotifications
+// all the follows is LOLCODE, travelers beware
 
-let DURATION: Int = 5
+let DURATION: Int = 1500 // 25 minutes
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
