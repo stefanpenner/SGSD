@@ -1,2 +1,3 @@
 SGSD.app/Contents/MacOS/*
 SGSD.app/Contents/_CodeSignature
+.DS_Store
