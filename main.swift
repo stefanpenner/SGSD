@@ -71,15 +71,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
             guard let self = self, let button = self.statusItem.button, event.window == button.window else { return event }
             
-            if event.type == .rightMouseDown || (event.type == .leftMouseDown && event.modifierFlags.contains(.control)) {
-                let menu = NSMenu()
-                let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-                menu.addItem(quitItem)
-                self.statusItem.menu = menu
-                button.performClick(nil)
-                self.statusItem.menu = nil
+            if self.shouldShowContextMenu(for: event) {
+                self.showContextMenu()
                 return nil
-            } else if event.type == .leftMouseDown {
+            } else if self.shouldToggleTimer(for: event) {
                 self.toggleTimer()
                 return nil
             }
@@ -97,6 +92,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Register notification category
         let category = UNNotificationCategory(identifier: "SGSD", actions: [], intentIdentifiers: [], options: [.customDismissAction])
         center.setNotificationCategories([category])
+    }
+
+    private func shouldShowContextMenu(for event: NSEvent) -> Bool {
+        return event.type == .rightMouseDown || (
+            event.type == .leftMouseDown && (
+                event.modifierFlags.contains(.control) || event.modifierFlags.contains(.option))
+        )
+    }
+    
+    private func shouldToggleTimer(for event: NSEvent) -> Bool {
+        return event.type == .leftMouseDown && !event.modifierFlags.contains(.command)
+    }
+    
+    private func showContextMenu() {
+        let menu = NSMenu()
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quitItem)
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
     }
 
     @objc func toggleTimer() {
