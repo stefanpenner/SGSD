@@ -1,0 +1,3 @@
+- [ ] explore package.swift
+- [ ] add some tests
+- [ ] expand capabilities?
