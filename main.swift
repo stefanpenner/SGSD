@@ -4,12 +4,64 @@ import UserNotifications
 
 let DURATION: Int = 1500 // 25 minutes
 
-class AppDelegate: NSObject, NSApplicationDelegate {
-    var statusItem: NSStatusItem!
+class State {
     var timer: Timer?
     var remainingTime: Int = DURATION
     var isRunning: Bool = false
+
+    func stopRunning() {
+        if !isRunning {
+            fatalError("State#stopRunning was called, but program was not running")
+        }
+
+        self.timer?.invalidate()
+        self.timer = nil
+        self.remainingTime = DURATION
+        self.isRunning = false
+    }
+
+    func startRunning() {
+        if isRunning {
+            fatalError("State#startRunning was called, but program was already running")
+        }
+
+        self.remainingTime = DURATION
+        self.isRunning = true
+    }
+
+    var minutesRemaining: Int {
+        get {
+            self.remainingTime / 60
+        }
+    }
+
+    var secondsRemaining: Int {
+        get {
+            self.remainingTime % 60
+        }
+    }
+
+    func tick() -> Int {
+        self.remainingTime -= 1
+        return self.remainingTime
+    }
+
+    func reset() {
+        self.timer?.invalidate()
+        self.isRunning = false
+        self.remainingTime = DURATION
+    }
+
+    func RemainingButtonTitle() -> String {
+        return String(format: "🙈 %02d:%02d", self.minutesRemaining, self.secondsRemaining)
+    }
+
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var statusItem: NSStatusItem!
     var eventMonitor: Any?
+    var state: State = State()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -48,29 +100,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func toggleTimer() {
-        if isRunning {
-            timer?.invalidate()
-            remainingTime = DURATION
+        if state.isRunning {
+            state.stopRunning()
             statusItem.button?.title = "🙉"
-            isRunning = false
         } else {
-            remainingTime = DURATION
-            timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
-            isRunning = true
+            state.startRunning()
+            state.timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
             updateTimer()
         }
     }
 
     @objc func updateTimer() {
-        remainingTime -= 1
-        let mins = remainingTime / 60
-        let secs = remainingTime % 60
-        statusItem.button?.title = String(format: "🙈 %02d:%02d", mins, secs)
-        if remainingTime <= 0 {
-            timer?.invalidate()
-            isRunning = false
-            remainingTime = DURATION
+
+        if state.tick() <= 0 {
+            state.reset()
+
             statusItem.button?.title = "🙉"
+
             let content = UNMutableNotificationContent()
             content.title = "SGSD"
             content.subtitle = "SGSD Timer"
@@ -84,6 +130,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if let error = error { print("Notification delivery error: \(error)") }
                 else { print("Notification scheduled successfully") }
             }
+        } else {
+            statusItem.button?.title = state.RemainingButtonTitle()
         }
     }
 
