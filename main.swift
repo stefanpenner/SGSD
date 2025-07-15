@@ -1,71 +1,83 @@
 import Cocoa
 import UserNotifications
-// all the follows is LOLCODE, travelers beware
 
-let DURATION: Int = 1500 // 25 minutes
+struct Config {
+    static let duration: Int = 1500 // 25 minutes
+    static let timerInterval: TimeInterval = 1.0
+    static let notificationDelay: TimeInterval = 0.1
+    
+    struct Notification {
+        static let title = "SGSD"
+        static let subtitle = "SGSD Timer"
+        static let body = "Time is up! Take a break :)"
+        static let categoryIdentifier = "SGSD"
+    }
+    
+    struct UI {
+        static let defaultEmoji = "🙉"
+        static let runningEmoji = "🙈"
+    }
+}
+
+// all the follows is LOLCODE, travelers beware
 
 class State {
     var timer: Timer?
-    var remainingTime: Int = DURATION
+    var remainingTime: Int = Config.duration
     var isRunning: Bool = false
-
-    func stopRunning() {
-        if !isRunning {
-            fatalError("State#stopRunning was called, but program was not running")
-        }
-
-        self.timer?.invalidate()
-        self.timer = nil
-        self.remainingTime = DURATION
-        self.isRunning = false
+    
+    var minutesRemaining: Int {
+        remainingTime / 60
     }
-
+    
+    var secondsRemaining: Int {
+        remainingTime % 60
+    }
+    
     func startRunning() {
-        if isRunning {
+        guard !isRunning else {
             fatalError("State#startRunning was called, but program was already running")
         }
-
-        self.remainingTime = DURATION
-        self.isRunning = true
+        
+        remainingTime = Config.duration
+        isRunning = true
     }
-
-    var minutesRemaining: Int {
-        get {
-            self.remainingTime / 60
+    
+    func stopRunning() {
+        guard isRunning else {
+            fatalError("State#stopRunning was called, but program was not running")
         }
+        
+        timer?.invalidate()
+        timer = nil
+        remainingTime = Config.duration
+        isRunning = false
     }
-
-    var secondsRemaining: Int {
-        get {
-            self.remainingTime % 60
-        }
-    }
-
-    func tick() -> Int {
-        self.remainingTime -= 1
-        return self.remainingTime
-    }
-
+    
     func reset() {
-        self.timer?.invalidate()
-        self.isRunning = false
-        self.remainingTime = DURATION
+        timer?.invalidate()
+        isRunning = false
+        remainingTime = Config.duration
     }
-
-    func RemainingButtonTitle() -> String {
-        return String(format: "🙈 %02d:%02d", self.minutesRemaining, self.secondsRemaining)
+    
+    func tick() -> Int {
+        remainingTime -= 1
+        return remainingTime
     }
-
+    
+    func remainingButtonTitle() -> String {
+        String(format: "\(Config.UI.runningEmoji) %02d:%02d", minutesRemaining, secondsRemaining)
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var eventMonitor: Any?
     var state: State = State()
-
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "🙉"
+        statusItem.button?.title = Config.UI.defaultEmoji
 
         // Monitor mouse events to differentiate click types
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
@@ -81,17 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
-        // Set up notifications
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound, .criticalAlert]) { granted, error in
-            if let error = error { print("Notification authorization error: \(error)") }
-            if !granted { print("Notification permission denied") }
-            else { print("Notification permission granted") }
-        }
-        
-        // Register notification category
-        let category = UNNotificationCategory(identifier: "SGSD", actions: [], intentIdentifiers: [], options: [.customDismissAction])
-        center.setNotificationCategories([category])
+        setupNotifications()
     }
 
     private func shouldShowContextMenu(for event: NSEvent) -> Bool {
@@ -103,6 +105,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func shouldToggleTimer(for event: NSEvent) -> Bool {
         return event.type == .leftMouseDown && !event.modifierFlags.contains(.command)
+    }
+    
+    private func setupNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .criticalAlert]) { granted, error in
+            if let error = error { 
+                print("Notification authorization error: \(error)") 
+            }
+            if !granted { 
+                print("Notification permission denied") 
+            } else { 
+                print("Notification permission granted") 
+            }
+        }
+        
+        let category = UNNotificationCategory(
+            identifier: Config.Notification.categoryIdentifier, 
+            actions: [], 
+            intentIdentifiers: [], 
+            options: [.customDismissAction]
+        )
+        center.setNotificationCategories([category])
     }
     
     private func showContextMenu() {
@@ -117,36 +141,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleTimer() {
         if state.isRunning {
             state.stopRunning()
-            statusItem.button?.title = "🙉"
+            statusItem.button?.title = Config.UI.defaultEmoji
         } else {
             state.startRunning()
-            state.timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
+            state.timer = Timer.scheduledTimer(
+                timeInterval: Config.timerInterval, 
+                target: self, 
+                selector: #selector(updateTimer), 
+                userInfo: nil, 
+                repeats: true
+            )
             updateTimer()
         }
     }
 
     @objc func updateTimer() {
-
         if state.tick() <= 0 {
             state.reset()
-
-            statusItem.button?.title = "🙉"
-
-            let content = UNMutableNotificationContent()
-            content.title = "SGSD"
-            content.subtitle = "SGSD Timer"
-            content.body = "Time is up! Take a break :)"
-            content.sound = UNNotificationSound.default
-            content.categoryIdentifier = "SGSD"
-            content.interruptionLevel = .critical
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-            let request = UNNotificationRequest(identifier: "SGSD_\(UUID().uuidString)", content: content, trigger: trigger)
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error = error { print("Notification delivery error: \(error)") }
-                else { print("Notification scheduled successfully") }
-            }
+            statusItem.button?.title = Config.UI.defaultEmoji
+            sendCompletionNotification()
         } else {
-            statusItem.button?.title = state.RemainingButtonTitle()
+            statusItem.button?.title = state.remainingButtonTitle()
+        }
+    }
+    
+    private func sendCompletionNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = Config.Notification.title
+        content.subtitle = Config.Notification.subtitle
+        content.body = Config.Notification.body
+        content.sound = UNNotificationSound.default
+        content.categoryIdentifier = Config.Notification.categoryIdentifier
+        content.interruptionLevel = .critical
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: Config.notificationDelay, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "SGSD_\(UUID().uuidString)", 
+            content: content, 
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error { 
+                print("Notification delivery error: \(error)") 
+            } else { 
+                print("Notification scheduled successfully") 
+            }
         }
     }
 
